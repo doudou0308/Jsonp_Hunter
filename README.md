@@ -4,6 +4,12 @@
 
 > 本项目基于 [kapytein/jsonp](https://github.com/kapytein/jsonp) 修改。上游采用 MIT 许可证，版权声明及许可原文见 [LICENSE-UPSTREAM](LICENSE-UPSTREAM)。
 
+## 本版本的改动与验证
+
+基于上游项目，本版本重新构造候选 URL，并通过随机 callback 和 JSON 响应体验证减少误报；加入 scope 限制、GET 过滤、去重和响应大小限制。检测到 JSONP 不等于确认漏洞。
+
+自动化测试覆盖模拟 Burp API 与本地 HTTP 请求。**尚未在真实 Burp + Jython 环境完成兼容性验收**；下方提供复现与验收步骤。
+
 ## 功能
 
 - 由 Burp Scanner 的扩展检查入口触发；只处理原始方法为 GET 的响应。
