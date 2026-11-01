@@ -1,89 +1,77 @@
-# JSONP Scanner for Burp Suite
+# JSONP Hunter
 
-一个基于 Burp Suite Legacy Extender API 的 Jython 扩展，用随机回调名探测 JSONP 行为。它报告的是**可观察到的 JSONP 行为**，不能直接证明存在漏洞或敏感数据泄露。
+基于 [kapytein/jsonp](https://github.com/kapytein/jsonp) 改写的 Burp Suite JSONP 探测扩展，使用 Jython 2.7 和 legacy Extender API。检测结果表示 JSONP 行为或线索，不能直接证明敏感数据泄露或可利用漏洞。
 
-> 本项目基于 [kapytein/jsonp](https://github.com/kapytein/jsonp) 修改。上游采用 MIT 许可证，版权声明及许可原文见 [LICENSE-UPSTREAM](LICENSE-UPSTREAM)。
+## 选择版本
 
-## 本版本的改动与验证
-
-基于上游项目，本版本重新构造候选 URL，并通过随机 callback 和 JSON 响应体验证减少误报；加入 scope 限制、GET 过滤、去重和响应大小限制。检测到 JSONP 不等于确认漏洞。
-
-自动化测试覆盖模拟 Burp API 与本地 HTTP 请求。
-
-## 功能
-
-- 由 Burp Scanner 的扩展检查入口触发；只处理原始方法为 GET 的响应。
-- 默认仅处理 Burp Target scope 内的 URL；需要配置 scope。
-- 原响应声明为 JSON，或响应体可以解析成 JSON，才会探测。
-- 测试 `.jsonp?callback=...`、`.jsonp`、`?callback=...` 和 `?jsonp=...` 四种变体；替换已有同名参数，保留其他查询参数。
-- 使用每个原始 URL 独立生成的随机 callback，要求 2xx 响应体为完整的 callback 调用，且参数可被 JSON 解析。
-- 清理与空 GET 请求不相符的请求头、请求不压缩的响应；保留 Cookie、Authorization 等原请求头。
-- 内存去重、添加标记请求头防止自身请求递归触发，并限制检查的响应大小。
-- 扫描结果包括原始请求/响应和匹配的探测请求/响应，便于手动复核。
-
-## 使用前了解
-
-**这个检查会发送额外请求。** 即使实现放在 `doPassiveScan`，它也不是纯被动分析：每个符合条件的 URL 最多发送四次 GET。GET 接口也可能有副作用；仅在明确授权且理解风险的范围内使用。探测会携带原请求的认证信息，测试请求会到达目标服务器，服务端也可能记录标记头和查询参数。
-
-扩展需要支持 Scanner 扩展检查的 Burp 版本和 Jython 2.7 standalone JAR。该代码基于旧版 Extender API；实际可用性取决于 Burp/Jython 版本和运行环境，发布前请进行真实环境验证。Burp 的 UI 名称会随版本变化。
-
-## 安装
-
-1. 从 Jython 官方渠道获取 Jython 2.7 standalone JAR，在 Burp 的 Extensions 设置中配置 Python environment 路径。
-2. 在 Extensions 中添加 Python 类型扩展，选择本仓库的 `jsonp_burp.py`。
-3. Output 出现 `JSONP Scanner loaded...` 说明注册代码运行完成；加载成功不代表已检测到漏洞。
-4. 在 Target 中将授权目标加入 scope，使用 Scanner 对含 JSON 响应的请求进行被动检查，或配置涵盖目标流量的 live audit。确认扫描配置启用了扩展检查。
-5. 在扩展 Output 中查看 `JSONP Scanner testing:`。若返回与随机回调匹配的 JSONP，检查结果会显示 `JSONP callback supported`。
-
-此扩展未注册 Proxy 流量监听器，流量经过代理本身不保证检查会运行。查询参数可能包含敏感信息，日志也会打印完整候选 URL，请妥善处理日志。
-
-## 检查结果如何解读
-
-`Information / Firm` 表示响应匹配了插件的 JSONP 语法检查；`Firm` 指对这种行为的确认程度，并非确认漏洞。请结合附带的 HTTP 消息，手动检查：数据是否敏感、认证是否必要、浏览器跨站请求是否携带相关 Cookie、目标是否提供其他保护，以及攻击者是否能实际读取数据。
-
-默认只接受类似 `callback({"key":"value"});` 的完整响应，并要求参数为 JSON。具有防劫持前缀、注释、多个参数或 JavaScript 对象字面量等非标准形式可能漏报。仅凭端点支持 JSONP 或返回公开数据，不应认定存在泄露。
-
-## 配置与限制
-
-可在加载前修改源码顶部的常量：
-
-| 常量 | 默认值 | 作用 |
+| 文件 | 用途 | 检测与控制 |
 | --- | --- | --- |
-| `REQUIRE_SCOPE` | `True` | 只探测 Burp scope 内的原始 URL；建议保持开启。 |
-| `MAX_RESPONSE_BYTES` | 1 MiB | 超过此大小的完整 HTTP 响应不解析。 |
-| `MAX_TRACKED_URLS` | 10000 | 每次加载最多记录的原始 URL 数；达到上限后跳过新 URL。重载扩展清空记录。 |
-| `CALLBACK_PARAMS` | `callback`, `jsonp` | 构造参数和去除原有参数所用的名称。 |
+| [`jsonp_v.py`](jsonp_v.py) | 带独立结果面板的交互版，支持过滤、CSV 和发送到 Repeater | `IHttpListener` 自动监听 JSON 响应；两个后台 worker；探测标记防递归；按 host、path、payload 去重；基础 MIME 和 callback 特征检查 |
+| [`jsonp_burp.py`](jsonp_burp.py) | 使用 Scanner 扩展检查的版本 | 默认 scope 内 GET；随机 callback；完整 JSONP/JSON 参数验证；响应大小和记录数量限制 |
 
-去重键是完整原始 URL，不区分不同 Cookie、响应内容或身份；同一 URL 的后续扫描会跳过。重载扩展可以重新检测。扩展不具备速率限制、并发控制、持久化配置或 UI；逐条请求同步发送，扫描大量不同 URL 时可能产生较高流量。不会自动跟随重定向；压缩响应或非常规编码可能导致漏报。无参数的 `.jsonp` 变体只有在服务端恰好返回本次随机 callback 时才会被报告，因此通常无法验证固定回调。带末尾斜杠的路径会尝试 `/path.jsonp/`，实际接口可能采用其他约定。
+**一次只加载其中一个版本**，避免重复探测。界面版的判定和资源限制尚未与 Scanner 版统一。
+
+## 界面版相对上游的改进
+
+| 方面 | kapytein/jsonp | 界面版 |
+| --- | --- | --- |
+| 触发入口 | Scanner 被动检查回调 | HTTP listener，可处理各工具经过的 JSON 响应 |
+| 结果展示 | Scanner issue | 独立 JSONP 标签页，展示候选、状态码、MIME、判定、摘要 |
+| 判定 | 返回 `script` MIME 即报告 | JS MIME 与 callback 特征结合；区分 HIT / SOFT / MISS / ERR |
+| 候选处理 | 首个命中后返回 | 继续检查剩余候选 |
+| 执行 | 扫描回调中同步请求 | 后台队列和两个 worker；单个任务中的候选仍串行发送 |
+| 重复发包 | 无显式发包去重 | 带锁的去重集合及探测头防递归 |
+| 证据 | issue 附带原始 JSON 消息 | HIT issue 附带实际探测请求和响应 |
+| 复测与整理 | 无专用面板 | 手动扫描、Repeater、筛选与 CSV 导出 |
+
+四种 payload 来自上游，不是新增检测策略：`.jsonp?callback=test`、`.jsonp`、`?callback=test`、`?jsonp=test`。当前 `.jsonp` 后缀在带扩展名的路径上会插入扩展名前，具体限制见下文。
+
+## 安装与使用
+
+目标环境：Burp Suite Professional 2025.7（Java 24）、Jython 2.7.4 standalone。代码使用 Python 2.7 语法；仍需在该实际环境验收。
+
+1. 在 Burp 的 Extensions 设置中配置 Jython standalone JAR。
+2. 添加 Python 扩展，选择 `jsonp_v.py`，确认 Output 出现加载提示。
+3. 打开 JSONP 标签页。默认 Auto scan 开启，观察经过 Burp 的 JSON 响应即可入队；也可以从已有 JSON 响应的右键菜单选择 `JSONP: scan selected`。
+4. 选中结果行后点击 **Send to Repeater**，或双击目标行。成功调用后，底部和 Output 显示编号，如 `JSONP-1`。
+5. 打开 Repeater，找到对应编号；在 Repeater 中点击 **Send** 才会实际发送该请求。失败时查看扩展 Errors。
+
+未选中行会弹出提示；双击按鼠标实际点击行定位；发送前会进行视图行到模型行转换。发送 API 正常返回只说明调用完成，仍应在 Repeater 中确认请求已出现。
+
+筛选支持文本和 Only HIT；CSV 导出全部已记录结果。Clear 只清显示记录；关闭 Auto scan 只停止接收新的自动任务，已有任务仍可继续运行。
+
+### Scanner 版
+
+若使用 `jsonp_burp.py`：先将授权目标加入 Burp Target scope，再用 Scanner 的被动检查或配置了扩展检查的 live audit 触发。该版本没有独立结果面板，代理流量经过 Burp 本身不保证触发检查。它使用随机 callback，只报告 2xx 且完整 callback 调用中包含可解析 JSON 的响应。
+
+源码配置：`REQUIRE_SCOPE=True`、`MAX_RESPONSE_BYTES=1 MiB`、`MAX_TRACKED_URLS=10000`。去重使用完整原始 URL，但不区分登录态；重载扩展会清空记录。
+
+## 界面版结果与已知限制
+
+- **HIT**：JS MIME 且匹配预期 callback 子串；会生成 `Information / Firm` issue。当前不是 JavaScript 语法验证，字符串、注释、函数声明等仍可能误报。
+- **SOFT**：JS MIME 但未匹配预期 callback，保留供人工检查。
+- **MISS**：未识别为 JS，不代表端点不存在 JSONP。
+- **ERR**：结果或响应为空；部分异常只记录到 Errors。
+
+当前尚未合入整套审计修复，尤其需要了解：
+
+- `?jsonp=test` 缺少 callback 映射，目前无法 HIT；无参数 `.jsonp` 通常只能 SOFT。
+- URL 构造存在扩展名、分号路径参数和已有同名 query 参数问题；例如 `/api.json` 会生成 `/api.jsonp.json`。
+- 去重忽略协议、端口、query 和登录态，可能漏测；Clear 不清除去重状态，手动扫描同样受去重限制。
+- 自动模式尚无 scope 和原始方法过滤；探测使用 GET，继承部分原请求头及认证信息。POST 请求体不会迁移到 query。
+- 队列、去重集合、结果与正文解析缺乏容量上限；CSV 尚未加固公式注入；大规模长时间运行需要进一步改进。
+- 暂无卸载时的完整 worker 停止机制；legacy `makeHttpRequest` 无单次请求超时或可靠取消接口，应检查项目网络超时设置。
+
+**两个版本都会主动发送额外 GET 请求。** 仅在明确授权的目标上使用。GET 也可能有业务副作用；认证头、Cookie 和标记头会到达目标。原版与这两个版本都不能自动证明跨站读取、凭证携带和数据敏感性。
 
 ## 测试
-
-在 Python 3 环境运行：
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-测试使用模拟的 Burp/Java API 和本地 HTTP 服务，覆盖 URL 生成、重复 callback 参数、JSONP 内容验证、范围/方法/标记过滤、请求头清理、去重及成功与不匹配的请求流程。它**不是** Burp + Jython 的实际兼容性测试，也不能覆盖所有真实站点行为。
-
-### 发布前的真实环境验收
-
-1. 在隔离环境启动一个可控的 JSON 接口，让 `callback` 参数返回合法 JSONP；另准备一个只返回 JSON 的对照接口。
-2. 在实际 Burp 和 Jython 2.7 环境加载扩展，加入目标 scope，使用 Scanner 处理两条 GET 响应。
-3. 检查 Output、Errors、扫描结果和实际流量：JSONP 接口有结果，对照接口无结果；确认发出的请求数量、Cookie 和请求头符合预期。
-4. 将目标移出 scope 再试、检查重复扫描、带原有 callback 的 URL，以及重载扩展后的行为。
-5. 记录并发布测试所用 Burp 版本、Jython 版本和结果；如果遇到 Java/Jython 兼容问题，修复后重新测试。
-
-## 目录
-
-```text
-jsonp_burp.py          扩展实现
-tests/test_scanner.py  自动化测试
-CHANGELOG.md           改动记录
-NOTICE.md              来源和版权说明
-LICENSE-UPSTREAM       上游 MIT 许可证原文
-```
+`test_scanner.py` 覆盖 Scanner 版逻辑和本地 HTTP 流程；`test_repeater.py` 通过提取界面版实际方法并模拟 Swing / Burp，检查行选择、排序映射、HTTPS、错误反馈和 EDT 调度。测试代码运行在 Python 3，扩展运行在 Jython 2.7；这些检查不等于 Burp / Java / Jython 实机兼容性验证。
 
 ## 来源与许可
 
-上游项目为 [kapytein/jsonp](https://github.com/kapytein/jsonp)，原作者版权声明与 MIT 许可证全文保存在 [LICENSE-UPSTREAM](LICENSE-UPSTREAM)。请在再分发时保留该声明及许可证。详见 [NOTICE.md](NOTICE.md)。本包未另外指定新增改动的许可证。
+上游：[kapytein/jsonp](https://github.com/kapytein/jsonp)，Copyright (c) 2019 kapytein，MIT License。原始声明及许可全文见 [LICENSE-UPSTREAM](LICENSE-UPSTREAM)，再分发时请保留。详见 [NOTICE.md](NOTICE.md)；本项目未另外指定新增改动的许可证。
