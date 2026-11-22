@@ -70,9 +70,15 @@
 
 ## 测试
 
+以下命令需要 Git 和 Python 3，在终端中克隆仓库并进入仓库根目录后运行：
+
 ```bash
+git clone https://github.com/doudou0308/Jsonp_Hunter.git
+cd Jsonp_Hunter
 python3 -m unittest discover -s tests -v
 ```
+
+如果已下载并解压源码，直接进入包含 `tests` 目录的项目根目录运行最后一条命令即可。Windows 安装了 Python Launcher 时，也可使用 `py -3 -m unittest discover -s tests -v`。
 
 `test_scanner.py` 覆盖 Scanner 版逻辑和本地 HTTP 流程；`test_repeater.py` 通过提取界面版实际方法并模拟 Swing / Burp，检查行选择、排序映射、HTTPS、错误反馈和 EDT 调度。测试代码运行在 Python 3，扩展运行在 Jython 2.7；这些检查不等于 Burp / Java / Jython 实机兼容性验证。
 
