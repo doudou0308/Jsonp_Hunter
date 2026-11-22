@@ -2,6 +2,15 @@
 
 基于 [kapytein/jsonp](https://github.com/kapytein/jsonp) 改写的 Burp Suite JSONP 探测扩展，使用 Jython 2.7 和 legacy Extender API。检测结果表示 JSONP 行为或线索，不能直接证明敏感数据泄露或可利用漏洞。
 
+## 目录
+
+- [下载与版本选择](#下载)
+- [与上游的差异](#界面版相对上游的改进)
+- [安装与使用](#安装与使用)
+- [结果与已知限制](#界面版结果与已知限制)
+- [测试](#测试)
+- [来源与许可](#来源与许可)
+
 ## 下载
 
 在 [Releases](https://github.com/doudou0308/Jsonp_Hunter/releases) 中选择版本，展开 **Assets** 下载 **Source code (zip)**，解压后按下表选择脚本加载。这是 Python/Jython 源码扩展，无需编译成 JAR。版本变更见 [更新记录](CHANGELOG.md)。
