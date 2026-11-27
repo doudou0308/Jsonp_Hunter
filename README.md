@@ -72,7 +72,7 @@
 - URL 构造存在扩展名、分号路径参数和已有同名 query 参数问题；例如 `/api.json` 会生成 `/api.jsonp.json`。
 - 去重忽略协议、端口、query 和登录态，可能漏测；Clear 不清除去重状态，手动扫描同样受去重限制。
 - 自动模式尚无 scope 和原始方法过滤；探测使用 GET，继承部分原请求头及认证信息。POST 请求体不会迁移到 query。
-- 队列、去重集合、结果与正文解析缺乏容量上限；CSV 尚未加固公式注入；大规模长时间运行需要进一步改进。
+- 队列、去重集合、结果与正文解析缺乏容量上限；CSV 导出已对常见公式前缀进行文本化处理，但不同电子表格软件的解释行为仍需人工确认；大规模长时间运行需要进一步改进。
 - 暂无卸载时的完整 worker 停止机制；legacy `makeHttpRequest` 无单次请求超时或可靠取消接口，应检查项目网络超时设置。
 
 **两个版本都会主动发送额外 GET 请求。** 仅在明确授权的目标上使用。GET 也可能有业务副作用；认证头、Cookie 和标记头会到达目标。原版与这两个版本都不能自动证明跨站读取、凭证携带和数据敏感性。
@@ -89,7 +89,7 @@ python3 -m unittest discover -s tests -v
 
 如果已下载并解压源码，直接进入包含 `tests` 目录的项目根目录运行最后一条命令即可。Windows 安装了 Python Launcher 时，也可使用 `py -3 -m unittest discover -s tests -v`。
 
-`test_scanner.py` 覆盖 Scanner 版逻辑和本地 HTTP 流程；`test_repeater.py` 通过提取界面版实际方法并模拟 Swing / Burp，检查行选择、排序映射、HTTPS、错误反馈和 EDT 调度。测试代码运行在 Python 3，扩展运行在 Jython 2.7；这些检查不等于 Burp / Java / Jython 实机兼容性验证。
+`test_scanner.py` 覆盖 Scanner 版逻辑和本地 HTTP 流程；`test_repeater.py` 通过提取界面版实际方法并模拟 Swing / Burp，检查行选择、排序映射、HTTPS、错误反馈和 EDT 调度。`test_csv.py` 检查 CSV 字段转义及常见公式前缀的文本化处理。测试代码运行在 Python 3，扩展运行在 Jython 2.7；这些检查不等于 Burp / Java / Jython 实机兼容性验证。
 
 ## 来源与许可
 
