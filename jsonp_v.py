@@ -590,7 +590,12 @@ class BurpExtender(IBurpExtender, IHttpListener, IContextMenuFactory):
             s = u'%s' % (value,)
         except:
             s = u''
-        if u',' in s or u'"' in s or u'\n' in s:
+        # Treat response-derived cells as text in spreadsheet applications.
+        # CSV quoting alone does not prevent formula interpretation.
+        if (s.startswith((u'\t', u'\r', u'\n')) or
+                s.lstrip().startswith((u'=', u'+', u'-', u'@'))):
+            s = u"'" + s
+        if any(ch in s for ch in (u',', u'"', u'\n', u'\r')):
             s = u'"' + s.replace(u'"', u'""') + u'"'
         return s
 
